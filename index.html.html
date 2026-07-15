@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>중구 지역사회보장계획 온라인 모니터링 시스템</title>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{margin:0}#cdn-error{display:none;padding:40px;text-align:center;font-family:'Malgun Gothic',sans-serif;color:#555;line-height:1.8}</style>
+</head><body><div id="root"></div>
+<div id="cdn-error"><h2>화면을 불러오지 못했습니다</h2>이 프로그램은 처음 열 때 인터넷 연결이 필요합니다 (React 라이브러리 로딩).<br>인터넷 연결을 확인한 뒤 새로고침(F5) 해주세요.<br>기관 보안망에서 cdn.jsdelivr.net / cdn.tailwindcss.com 접속이 차단된 경우 전산 담당자에게 허용을 요청하세요.</div>
+<script>
+window.addEventListener("load", function(){ setTimeout(function(){ if (typeof React === "undefined" || typeof ReactDOM === "undefined" || typeof Babel === "undefined") { document.getElementById("cdn-error").style.display = "block"; } }, 1500); });
+</script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useCallback } = React;
+
+/* ══════════════════════════════════════════════════════════════
+   중구 지역사회보장계획 2026년 연차별 시행계획 온라인 모니터링 시스템
+   - 관리자 / 공공(사업담당) / 모니터링단 / 전문가 4개 역할
+   - 공공: 실적입력(파일첨부 포함) → 백엔드(Apps Script)로 전송
+   - 모니터링단·전문가: 공공 제출자료 열람 → 기존 구글폼으로 평가
+   - 관리자: 종합대시보드 · 사업별현황 · 집계결과 · 결과보고서 자동생성
+   ══════════════════════════════════════════════════════════════ */
+
+// ⚠️ 배포 후 Apps Script 웹앱 URL을 여기에 붙여넣으세요
+const API_URL = "https://script.google.com/macros/s/AKfycbwsR1XmlpMHqlX_CkBte0Ov4ghCsf-Y5RavcyPNgAk7s6Tcd7U7yKwoUFVnYRkiNgBL/exec";
+
+// ⚠️ 위원 평가용 기존 구글폼 응답 링크
+const MONITOR_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScle-bzvhQvW-zwwuUxKGHRIGutgsRqE5_0J1AfLkMcQYWg4Q/viewform";
+
+const PROJECTS = [{"분과": "복지기획분과", "사업번호": "Ⅰ-2-1", "사업명": "온오프라인 생활건강 실천프로그램", "담당부서": "보건과", "유형번호": 5.0, "유형명": "⑤ 교육·홍보·인식개선형"}, {"분과": "복지기획분과", "사업번호": "Ⅰ-2-3", "사업명": "구민안심 감염병 교육", "담당부서": "보건과", "유형번호": 5.0, "유형명": "⑤ 교육·홍보·인식개선형"}, {"분과": "복지기획분과", "사업번호": "Ⅱ-1-2-1", "사업명": "부정수급방지예방안내", "담당부서": "생활보장과", "유형번호": 5.0, "유형명": "⑤ 교육·홍보·인식개선형"}, {"분과": "복지기획분과", "사업번호": "Ⅱ-1-2-2", "사업명": "사회보장급여대상자 신규 및 확인조사", "담당부서": "생활보장과", "유형번호": 3.0, "유형명": "③ 발굴·사례관리·안전망형"}, {"분과": "복지기획분과", "사업번호": "Ⅱ-4-1-1", "사업명": "복지박람회 개최", "담당부서": "복지정책과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "복지기획분과", "사업번호": "Ⅱ-4-1-2", "사업명": "한마음순회봉사", "담당부서": "복지정책과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "복지기획분과", "사업번호": "Ⅱ-4-1-3", "사업명": "자원봉사활성화", "담당부서": "생활보장과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "복지기획분과", "사업번호": "Ⅱ-4-2-1", "사업명": "건강상담센터운영", "담당부서": "보건과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "복지기획분과", "사업번호": "Ⅱ-4-2-2", "사업명": "우리동네복지정보알림코너", "담당부서": "복지기획", "유형번호": 5.0, "유형명": "⑤ 교육·홍보·인식개선형"}, {"분과": "노인분과", "사업번호": "Ⅰ-2-2", "사업명": "은빛순라군이 밝히는 중구", "담당부서": "복지정책과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "노인분과", "사업번호": "Ⅰ-3-7", "사업명": "노인일자리및사회활동지원", "담당부서": "복지정책과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "노인분과", "사업번호": "Ⅰ-4-2", "사업명": "노인 학대 예방 사업 강화", "담당부서": "복지정책과", "유형번호": 5.0, "유형명": "⑤ 교육·홍보·인식개선형"}, {"분과": "노인분과", "사업번호": "Ⅱ-4-3-1", "사업명": "노인복지관건립", "담당부서": "복지정책과", "유형번호": 1.0, "유형명": "① 인프라·시설조성형"}, {"분과": "여성가족분과", "사업번호": "Ⅰ-1-1", "사업명": "공동육아나눔터운영", "담당부서": "복지정책과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "여성가족분과", "사업번호": "Ⅰ-1-2", "사업명": "국공립 어린이집 이용 활성화", "담당부서": "-", "유형번호": 5.0, "유형명": "⑤ 교육·홍보·인식개선형"}, {"분과": "여성가족분과", "사업번호": "Ⅰ-1-7", "사업명": "다문화가족 사회포용안전망 구축", "담당부서": "복지정책과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "여성가족분과", "사업번호": "Ⅰ-3-4", "사업명": "일·가정 양립사회 분위기 조성", "담당부서": "복지정책과", "유형번호": 5.0, "유형명": "⑤ 교육·홍보·인식개선형"}, {"분과": "장애인분과", "사업번호": "Ⅰ-2-8", "사업명": "소규모공중이용시설경사로설치", "담당부서": "생활보장과", "유형번호": 1.0, "유형명": "① 인프라·시설조성형"}, {"분과": "장애인분과", "사업번호": "Ⅰ-3-6", "사업명": "장애인일자리창출", "담당부서": "생활보장과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "장애인분과", "사업번호": "Ⅱ-2-1-2", "사업명": "장애인중심사례관리", "담당부서": "생활보장과", "유형번호": 3.0, "유형명": "③ 발굴·사례관리·안전망형"}, {"분과": "아동청소년분과", "사업번호": "Ⅰ-1-3", "사업명": "작은도서관에서 누리는 문화예술", "담당부서": "문화교육과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "아동청소년분과", "사업번호": "Ⅰ-1-4", "사업명": "청소년문화의집 활성화", "담당부서": "문화교육과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "아동청소년분과", "사업번호": "Ⅰ-1-5", "사업명": "어린이놀이시설 안전성 강화", "담당부서": "안전총괄과", "유형번호": 1.0, "유형명": "① 인프라·시설조성형"}, {"분과": "아동청소년분과", "사업번호": "Ⅰ-1-6", "사업명": "아동청소년마음건강지킴이사업", "담당부서": "문화교육과", "유형번호": 3.0, "유형명": "③ 발굴·사례관리·안전망형"}, {"분과": "자살예방분과", "사업번호": "Ⅱ-2-2-1", "사업명": "자살예방 민관협력", "담당부서": "보건과", "유형번호": 4.0, "유형명": "④ 협의체·거버넌스형"}, {"분과": "자살예방분과", "사업번호": "Ⅱ-2-2-2", "사업명": "생명존중 자살예방 교육 확대", "담당부서": "보건과", "유형번호": 5.0, "유형명": "⑤ 교육·홍보·인식개선형"}, {"분과": "일자리분과", "사업번호": "Ⅰ-2-6", "사업명": "청년커뮤니티활동지원", "담당부서": "혁신사업홍보과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "일자리분과", "사업번호": "Ⅰ-3-1", "사업명": "청년일자리사업확충", "담당부서": "경제과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "일자리분과", "사업번호": "Ⅰ-3-2", "사업명": "사회적경제활성화사업", "담당부서": "경제과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "일자리분과", "사업번호": "Ⅰ-3-5", "사업명": "중장년 창업지원 프로그램 개발", "담당부서": "경제과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "일자리분과", "사업번호": "Ⅰ-4-4", "사업명": "청년사업자임대료지원", "담당부서": "혁신사업홍보과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "사회적고립예방분과", "사업번호": "Ⅰ-2-7", "사업명": "노숙인 보호 및 지원활동", "담당부서": "복지정책과", "유형번호": 3.0, "유형명": "③ 발굴·사례관리·안전망형"}, {"분과": "사회적고립예방분과", "사업번호": "Ⅰ-4-1", "사업명": "고독사예방안전망구축", "담당부서": "복지기획", "유형번호": 3.0, "유형명": "③ 발굴·사례관리·안전망형"}, {"분과": "사회적고립예방분과", "사업번호": "Ⅰ-4-6", "사업명": "취약계층주거환경개선사업", "담당부서": "생활보장과", "유형번호": 1.0, "유형명": "① 인프라·시설조성형"}, {"분과": "사회적고립예방분과", "사업번호": "Ⅱ-1-1-1", "사업명": "공공빅데이터활용위기가구사전발굴", "담당부서": "생활보장과", "유형번호": 3.0, "유형명": "③ 발굴·사례관리·안전망형"}, {"분과": "사회적고립예방분과", "사업번호": "Ⅱ-1-1-2", "사업명": "위기가구발굴인적안전망확대", "담당부서": "생활보장과", "유형번호": 3.0, "유형명": "③ 발굴·사례관리·안전망형"}, {"분과": "사회적고립예방분과", "사업번호": "Ⅱ-2-1-1", "사업명": "찾아가는보건복지서비스", "담당부서": "복지기획", "유형번호": 3.0, "유형명": "③ 발굴·사례관리·안전망형"}, {"분과": "복지마을분과", "사업번호": "Ⅰ-2-4", "사업명": "주민주도·참여형 마을축제 지원", "담당부서": "문화교육과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "복지마을분과", "사업번호": "Ⅰ-4-3", "사업명": "평생교육 프로그램 활성화", "담당부서": "문화교육과", "유형번호": 5.0, "유형명": "⑤ 교육·홍보·인식개선형"}, {"분과": "복지마을분과", "사업번호": "Ⅰ-4-5", "사업명": "중구사랑나눔사업", "담당부서": "복지정책과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "복지마을분과", "사업번호": "Ⅰ-4-7", "사업명": "취약계층 문화예술 활동지원", "담당부서": "문화교육과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}, {"분과": "복지마을분과", "사업번호": "Ⅱ-3-1-1", "사업명": "지역사회보장협의체활성화", "담당부서": "생활보장과", "유형번호": 4.0, "유형명": "④ 협의체·거버넌스형"}, {"분과": "복지마을분과", "사업번호": "Ⅱ-3-1-2", "사업명": "민관협력활성화", "담당부서": "생활보장과", "유형번호": 4.0, "유형명": "④ 협의체·거버넌스형"}, {"분과": "복지마을분과", "사업번호": "Ⅱ-3-2-2", "사업명": "동지역사회보장협의체활성화", "담당부서": "생활보장과", "유형번호": 4.0, "유형명": "④ 협의체·거버넌스형"}, {"분과": "복지마을분과", "사업번호": "Ⅱ-3-2-3", "사업명": "1마을1특화사업추진", "담당부서": "생활보장과", "유형번호": 2.0, "유형명": "② 프로그램·서비스제공형"}]
+;
+
+const BUNGA_ORDER = ["복지기획분과", "노인분과", "여성가족분과", "장애인분과", "아동청소년분과",
+  "자살예방분과", "일자리분과", "사회적고립예방분과", "복지마을분과"];
+
+const C = {
+  navy: "#1E2761", navyDark: "#141A45", navySoft: "#E8EAF5",
+  paper: "#F6F4EE", surface: "#FFFFFF", ink: "#1C201D",
+  muted: "#6B7169", line: "#DCD8CC",
+  ok: "#2E7D5B", warn: "#B8860B", bad: "#B4472F",
+};
+
+const ROLES = [
+  { id: "admin", label: "관리자(사무국)" },
+  { id: "gonggong", label: "공공(사업담당)" },
+  { id: "monitor", label: "모니터링단" },
+  { id: "expert", label: "전문가" },
+];
+
+function Pill({ children, color }) {
+  return <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: `${color}1A`, color }}>{children}</span>;
+}
+function Card({ title, children, right }) {
+  return (
+    <div className="rounded-xl p-5 mb-5" style={{ background: C.surface, border: `1px solid ${C.line}` }}>
+      {title ? <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-base" style={{ color: C.ink }}>{title}</h3>{right}
+      </div> : null}
+      {children}
+    </div>
+  );
+}
+function Field({ label, children, required }) {
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-semibold mb-1.5" style={{ color: C.ink }}>{label}{required ? <span style={{ color: C.bad }}> *</span> : null}</label>
+      {children}
+    </div>
+  );
+}
+function TA(props) {
+  return <textarea rows={props.rows || 2} value={props.value || ""} placeholder={props.placeholder}
+    onChange={(e) => props.onChange(e.target.value)} className="w-full rounded-md px-3 py-2 text-sm"
+    style={{ border: `1px solid ${C.line}`, resize: "vertical" }} />;
+}
+function IN(props) {
+  return <input type={props.type || "text"} value={props.value ?? ""} placeholder={props.placeholder}
+    onChange={(e) => props.onChange(e.target.value)} className="rounded-md px-2.5 py-1.5 text-sm w-full"
+    style={{ border: `1px solid ${C.line}` }} />;
+}
+function gradeColor(g) {
+  if (g === "우수") return C.ok;
+  if (g === "양호") return "#4C8C6B";
+  if (g === "보통") return C.warn;
+  return C.bad;
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1]);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+/* ── 파일 첨부 위젯 (한글/PDF/이미지) ───────────────────────── */
+function FileAttach({ files, setFiles }) {
+  const onPick = async (e) => {
+    const picked = Array.from(e.target.files || []);
+    const converted = [];
+    for (const f of picked) {
+      if (f.size > 8 * 1024 * 1024) { alert(`"${f.name}" 파일이 8MB를 초과합니다. 더 작은 파일로 첨부해 주세요.`); continue; }
+      const base64 = await fileToBase64(f);
+      converted.push({ name: f.name, mimeType: f.type || "application/octet-stream", base64 });
+    }
+    setFiles([...files, ...converted]);
+  };
+  return (
+    <div>
+      <input type="file" multiple accept=".hwp,.hwpx,.pdf,image/*" onChange={onPick}
+        className="text-sm" />
+      <p className="text-xs mt-1" style={{ color: C.muted }}>한글(HWP/HWPX)·PDF·이미지 파일 첨부 가능 (파일당 8MB 이하)</p>
+      {files.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {files.map((f, i) => (
+            <li key={i} className="flex items-center justify-between text-sm rounded px-2 py-1" style={{ background: C.navySoft }}>
+              <span>📎 {f.name}</span>
+              <button onClick={() => setFiles(files.filter((_, j) => j !== i))} className="text-xs font-bold" style={{ color: C.bad }}>삭제</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ── 공공(사업담당) : 실적입력 ──────────────────────────────── */
+function GonggongInput({ flash }) {
+  const [code, setCode] = useState("");
+  const [form, setForm] = useState({
+    officerName: "", officerPhone: "", budgetPlan: "", budgetSpent: "",
+    goalContent: "", goalStatus: "", hasChange: false, changeContent: "",
+    progress: "", plan: ""
+  });
+  const [files, setFiles] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const project = PROJECTS.find((p) => p.사업번호 === code);
+  const set = (k, v) => setForm({ ...form, [k]: v });
+  const rate = form.budgetPlan > 0 ? Math.round((Number(form.budgetSpent) / Number(form.budgetPlan)) * 1000) / 10 : null;
+
+  const submit = async () => {
+    if (!code) { alert("사업을 먼저 선택해 주세요."); return; }
+    if (!form.officerName) { alert("담당자명을 입력해 주세요."); return; }
+    setSubmitting(true);
+    try {
+      const payload = {
+        projectCode: code, projectName: project ? project.사업명 : "", dept: project ? project.담당부서 : "",
+        ...form, files
+      };
+      // Apps Script 웹앱은 POST 응답의 CORS 헤더를 브라우저가 못 읽는 경우가 있어
+      // no-cors 모드로 전송합니다 (요청 자체는 정상 처리되지만, 응답 내용은 읽을 수 없습니다).
+      await fetch(API_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
+      flash(`제출 요청을 보냈습니다. 잠시 후 워크북에서 반영 여부를 확인해 주세요.`);
+      setForm({ officerName: "", officerPhone: "", budgetPlan: "", budgetSpent: "", goalContent: "", goalStatus: "", hasChange: false, changeContent: "", progress: "", plan: "" });
+      setFiles([]);
+    } catch (err) {
+      alert("전송 오류: " + err.message + " (API_URL 설정을 확인해 주세요)");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div>
+      <Card title="사업 선택">
+        <select value={code} onChange={(e) => setCode(e.target.value)} className="w-full rounded-md px-3 py-2 text-sm" style={{ border: `1px solid ${C.line}` }}>
+          <option value="">-- 담당 사업을 선택하세요 --</option>
+          {BUNGA_ORDER.map((b) => (
+            <optgroup key={b} label={b}>
+              {PROJECTS.filter((p) => p.분과 === b).map((p) => (
+                <option key={p.사업번호} value={p.사업번호}>{p.사업번호} · {p.사업명}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        {project && <p className="text-xs mt-2" style={{ color: C.muted }}>담당부서: {project.담당부서} · 유형: {project.유형명}</p>}
+      </Card>
+
+      {code && (
+        <Card title="실적 입력">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="담당자명" required><IN value={form.officerName} onChange={(v) => set("officerName", v)} /></Field>
+            <Field label="연락처"><IN value={form.officerPhone} onChange={(v) => set("officerPhone", v)} placeholder="000-0000" /></Field>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="사업비 계획(백만원)"><IN type="number" value={form.budgetPlan} onChange={(v) => set("budgetPlan", v)} /></Field>
+            <Field label="사업비 집행(백만원)"><IN type="number" value={form.budgetSpent} onChange={(v) => set("budgetSpent", v)} /></Field>
+            <Field label="집행률(자동계산)"><div className="rounded-md px-3 py-2 text-sm font-bold" style={{ background: C.navySoft, color: C.navy }}>{rate !== null ? `${rate}%` : "-"}</div></Field>
+          </div>
+          <Field label="성과목표 내용"><TA value={form.goalContent} onChange={(v) => set("goalContent", v)} /></Field>
+          <Field label="성과목표 달성현황"><TA value={form.goalStatus} onChange={(v) => set("goalStatus", v)} /></Field>
+          <Field label="변경사항 여부">
+            <div className="flex gap-4 text-sm">
+              <label><input type="radio" checked={!form.hasChange} onChange={() => set("hasChange", false)} /> 없음</label>
+              <label><input type="radio" checked={form.hasChange} onChange={() => set("hasChange", true)} /> 있음</label>
+            </div>
+          </Field>
+          {form.hasChange && <Field label="변경사항 내용"><TA value={form.changeContent} onChange={(v) => set("changeContent", v)} /></Field>}
+          <Field label="상반기 추진현황"><TA value={form.progress} onChange={(v) => set("progress", v)} rows={3} /></Field>
+          <Field label="향후계획"><TA value={form.plan} onChange={(v) => set("plan", v)} rows={3} /></Field>
+          <Field label="증빙자료 첨부"><FileAttach files={files} setFiles={setFiles} /></Field>
+
+          <button onClick={submit} disabled={submitting} className="w-full py-3 rounded-lg font-bold text-white mt-2"
+            style={{ background: submitting ? C.muted : C.navy }}>
+            {submitting ? "제출 중..." : "제출하기"}
+          </button>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/* ── 모니터링단/전문가 : 자료열람 + 평가 링크 ───────────────── */
+function MonitorView({ data }) {
+  const [code, setCode] = useState("");
+  const perf = data.performance.find((p) => p.사업번호 === code);
+  const project = PROJECTS.find((p) => p.사업번호 === code);
+
+  return (
+    <div>
+      <Card title="평가 대상 사업 선택">
+        <select value={code} onChange={(e) => setCode(e.target.value)} className="w-full rounded-md px-3 py-2 text-sm" style={{ border: `1px solid ${C.line}` }}>
+          <option value="">-- 사업을 선택하세요 --</option>
+          {BUNGA_ORDER.map((b) => (
+            <optgroup key={b} label={b}>
+              {PROJECTS.filter((p) => p.분과 === b).map((p) => (
+                <option key={p.사업번호} value={p.사업번호}>{p.사업번호} · {p.사업명}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </Card>
+
+      {code && (
+        <Card title={`공공 제출 자료 열람 — ${project ? project.사업명 : ""}`}>
+          {!perf ? (
+            <p className="text-sm" style={{ color: C.muted }}>아직 담당 공무원이 제출한 실적자료가 없습니다.</p>
+          ) : (
+            <div className="text-sm space-y-2">
+              <div><b>담당자:</b> {perf.담당자명} ({perf.연락처})</div>
+              <div><b>사업비:</b> 계획 {perf["사업비_계획(백만원)"]}백만원 / 집행 {perf["사업비_집행(백만원)"]}백만원 (집행률 {perf["집행률(%)"]}%)</div>
+              <div><b>성과목표:</b> {perf.성과목표_내용}</div>
+              <div><b>달성현황:</b> {perf.성과목표_달성현황}</div>
+              <div><b>변경사항:</b> {perf.변경사항_유무} {perf.변경사항_내용 ? `— ${perf.변경사항_내용}` : ""}</div>
+              <div><b>상반기 추진현황:</b> {perf.상반기_추진현황}</div>
+              <div><b>향후계획:</b> {perf.향후계획}</div>
+              {perf.첨부파일_링크 && (
+                <div><b>첨부자료:</b> {perf.첨부파일_링크.split(",").map((u, i) => (
+                  <a key={i} href={u.trim()} target="_blank" rel="noreferrer" className="underline mr-2" style={{ color: C.navy }}>파일{i + 1}</a>
+                ))}</div>
+              )}
+            </div>
+          )}
+          <a href={MONITOR_FORM_URL} target="_blank" rel="noreferrer">
+            <button className="w-full py-3 rounded-lg font-bold text-white mt-4" style={{ background: C.navy }}>
+              이 자료를 참고하여 구글폼으로 평가하러 가기 →
+            </button>
+          </a>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/* ── 관리자 : 종합대시보드 ──────────────────────────────────── */
+function AdminDashboard({ data }) {
+  const submittedCodes = new Set(data.performance.map((p) => p.사업번호));
+  const submitCount = PROJECTS.filter((p) => submittedCodes.has(p.사업번호)).length;
+  const scoreByCode = {};
+  data.scores.forEach((s) => { scoreByCode[s.사업번호] = s; });
+
+  const gradeCount = { 우수: 0, 양호: 0, 보통: 0, 개선필요: 0 };
+  data.scores.forEach((s) => { if (gradeCount[s.등급] !== undefined) gradeCount[s.등급]++; });
+  const overallAvg = data.scores.length ? (data.scores.reduce((a, s) => a + Number(s.종합점수 || 0), 0) / data.scores.length).toFixed(1) : "-";
+
+  return (
+    <div>
+      <div className="grid grid-cols-4 gap-4 mb-5">
+        {[["세부사업", `${PROJECTS.length}개`], ["공공 실적 제출", `${submitCount}/${PROJECTS.length}`],
+          ["위원 평가 완료", `${data.scores.length}/${PROJECTS.length}`], ["전체 평균 종합점수", overallAvg]].map(([l, v]) => (
+          <div key={l} className="rounded-xl p-4 text-center" style={{ background: C.navySoft }}>
+            <div className="text-2xl font-extrabold" style={{ color: C.navy }}>{v}</div>
+            <div className="text-xs mt-1" style={{ color: C.muted }}>{l}</div>
+          </div>
+        ))}
+      </div>
+      <Card title="등급 분포">
+        <div className="grid grid-cols-4 gap-3">
+          {Object.entries(gradeCount).map(([g, n]) => (
+            <div key={g} className="rounded-lg p-3 text-center" style={{ background: `${gradeColor(g)}15` }}>
+              <div className="text-xl font-bold" style={{ color: gradeColor(g) }}>{n}</div>
+              <div className="text-xs" style={{ color: C.muted }}>{g}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <Card title="분과별 요약">
+        <table className="w-full text-sm">
+          <thead><tr style={{ background: C.navy, color: "#fff" }}>
+            {["분과", "사업수", "실적제출", "평가완료", "평균점수"].map((h) => <th key={h} className="px-2 py-2 text-left">{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {BUNGA_ORDER.map((b) => {
+              const items = PROJECTS.filter((p) => p.분과 === b);
+              const sub = items.filter((p) => submittedCodes.has(p.사업번호)).length;
+              const evald = items.filter((p) => scoreByCode[p.사업번호]).length;
+              const scores = items.map((p) => scoreByCode[p.사업번호]).filter(Boolean);
+              const avg = scores.length ? (scores.reduce((a, s) => a + Number(s.종합점수 || 0), 0) / scores.length).toFixed(1) : "-";
+              return (
+                <tr key={b} style={{ borderBottom: `1px solid ${C.line}` }}>
+                  <td className="px-2 py-2">{b}</td><td className="px-2 py-2">{items.length}</td>
+                  <td className="px-2 py-2">{sub}/{items.length}</td><td className="px-2 py-2">{evald}/{items.length}</td>
+                  <td className="px-2 py-2 font-bold">{avg}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+/* ── 관리자 : 사업별 현황 ───────────────────────────────────── */
+function AdminProjectList({ data }) {
+  const submittedCodes = new Set(data.performance.map((p) => p.사업번호));
+  const scoreByCode = {};
+  data.scores.forEach((s) => { scoreByCode[s.사업번호] = s; });
+  return (
+    <Card title="사업별 현황 (전체 45개)">
+      <table className="w-full text-sm">
+        <thead><tr style={{ background: C.navy, color: "#fff" }}>
+          {["분과", "사업번호", "사업명", "공공제출", "종합점수", "등급"].map((h) => <th key={h} className="px-2 py-2 text-left">{h}</th>)}
+        </tr></thead>
+        <tbody>
+          {PROJECTS.map((p) => {
+            const s = scoreByCode[p.사업번호];
+            return (
+              <tr key={p.사업번호} style={{ borderBottom: `1px solid ${C.line}` }}>
+                <td className="px-2 py-1.5">{p.분과}</td><td className="px-2 py-1.5">{p.사업번호}</td>
+                <td className="px-2 py-1.5">{p.사업명}</td>
+                <td className="px-2 py-1.5">{submittedCodes.has(p.사업번호) ? <Pill color={C.ok}>제출완료</Pill> : <Pill color={C.bad}>미제출</Pill>}</td>
+                <td className="px-2 py-1.5">{s ? s.종합점수 : "-"}</td>
+                <td className="px-2 py-1.5">{s ? <Pill color={gradeColor(s.등급)}>{s.등급}</Pill> : "-"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
+/* ── 관리자 : 결과보고서 자동생성 (인쇄/PDF) ────────────────── */
+function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+function buildReportHtml(data) {
+  const scoreByCode = {}; data.scores.forEach((s) => { scoreByCode[s.사업번호] = s; });
+  const overallAvg = data.scores.length ? (data.scores.reduce((a, s) => a + Number(s.종합점수 || 0), 0) / data.scores.length).toFixed(1) : "-";
+  const rows = PROJECTS.map((p) => {
+    const s = scoreByCode[p.사업번호] || {};
+    return `<tr><td>${esc(p.분과)}</td><td>${esc(p.사업번호)}</td><td>${esc(p.사업명)}</td><td>${esc(s.종합점수 || "-")}</td><td>${esc(s.등급 || "-")}</td></tr>`;
+  }).join("");
+  return `
+    <h1>2026년 연차별 시행계획 모니터링 결과보고서</h1>
+    <p>대구광역시 중구 · 생성일 ${new Date().toLocaleDateString("ko-KR")}</p>
+    <h2>종합 결과</h2>
+    <p>세부사업 ${PROJECTS.length}개 / 전체 평균 종합점수 ${overallAvg}점</p>
+    <h2>사업별 상세 결과</h2>
+    <table border="1" cellspacing="0" cellpadding="6" style="width:100%;border-collapse:collapse">
+      <tr style="background:#1E2761;color:#fff"><th>분과</th><th>사업번호</th><th>사업명</th><th>종합점수</th><th>등급</th></tr>
+      ${rows}
+    </table>`;
+}
+
+function printReport(data) {
+  const w = window.open("", "_blank");
+  const html = buildReportHtml(data);
+  w.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>모니터링 결과보고서</title>
+  <style>body{font-family:'Malgun Gothic',sans-serif;padding:30px;color:#1C201D}h1{font-size:22px}h2{font-size:16px;margin-top:24px}
+  table{font-size:13px}th,td{border:1px solid #ccc;padding:6px}</style></head><body>${html}
+  <div style="margin:24px 0;text-align:center"><button onclick="window.print()" style="padding:10px 22px;font-weight:700;background:#1E2761;color:#fff;border:none;border-radius:8px">🖨 인쇄 / PDF로 저장</button></div>
+  <script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>`);
+  w.document.close();
+}
+
+/* ── 최상위 App ─────────────────────────────────────────────── */
+function App() {
+  const [role, setRole] = useState("gonggong");
+  const [tab, setTab] = useState("input");
+  const [data, setData] = useState({ performance: [], scores: [], bungaSummary: [] });
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState("");
+
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2500); };
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(API_URL);
+      const json = await res.json();
+      if (json.status === "ok") setData({ performance: json.performance || [], scores: json.scores || [], bungaSummary: json.bungaSummary || [] });
+    } catch (e) { /* API_URL 미설정 시 무시 */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const tabsByRole = {
+    admin: [["dashboard", "종합대시보드"], ["projects", "사업별현황"], ["report", "결과보고서"]],
+    gonggong: [["input", "실적입력"]],
+    monitor: [["view", "자료열람"]],
+    expert: [["view", "자료열람"]],
+  };
+
+  useEffect(() => { setTab(tabsByRole[role][0][0]); }, [role]);
+
+  return (
+    <div style={{ background: C.paper, minHeight: "100vh", fontFamily: "'Pretendard','Malgun Gothic',sans-serif" }}>
+      <div style={{ background: C.navy }} className="px-6 py-5 text-white">
+        <div className="text-xs opacity-80">대구광역시 중구지역사회보장협의체</div>
+        <div className="text-xl font-extrabold">2026년 연차별 시행계획 온라인 모니터링 시스템</div>
+        <div className="mt-3">
+          <select value={role} onChange={(e) => setRole(e.target.value)} className="rounded-md px-3 py-1.5 text-sm text-black">
+            {ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="px-6 pt-4 flex gap-2 flex-wrap">
+        {tabsByRole[role].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-t-lg text-sm font-semibold"
+            style={{ background: tab === id ? C.surface : "transparent", color: tab === id ? C.navy : C.muted, border: tab === id ? `1px solid ${C.line}` : "none", borderBottom: tab === id ? "none" : undefined }}>
+            {label}
+          </button>
+        ))}
+        <button onClick={load} className="ml-auto text-xs px-3 py-1.5 rounded-md" style={{ border: `1px solid ${C.line}`, color: C.muted }}>🔄 새로고침</button>
+      </div>
+
+      <div className="p-6">
+        {loading ? <p style={{ color: C.muted }}>불러오는 중…</p> : (
+          <>
+            {tab === "input" && <GonggongInput flash={flash} />}
+            {tab === "view" && <MonitorView data={data} />}
+            {tab === "dashboard" && <AdminDashboard data={data} />}
+            {tab === "projects" && <AdminProjectList data={data} />}
+            {tab === "report" && (
+              <Card title="결과보고서 자동 생성">
+                <p className="text-sm mb-3" style={{ color: C.muted }}>현재 집계된 데이터를 기준으로 인쇄용 보고서를 새 창으로 엽니다. 인쇄 대화상자에서 "PDF로 저장"을 선택하면 PDF 파일로 저장됩니다.</p>
+                <button onClick={() => printReport(data)} className="px-5 py-3 rounded-lg font-bold text-white" style={{ background: C.navy }}>🖨 결과보고서 인쇄 / PDF 저장</button>
+              </Card>
+            )}
+          </>
+        )}
+      </div>
+
+      {toast && <div className="fixed bottom-6 right-6 px-4 py-3 rounded-lg text-white font-semibold" style={{ background: C.navy }}>{toast}</div>}
+    </div>
+  );
+}
+
+const rootEl = document.getElementById("root");
+ReactDOM.createRoot(rootEl).render(<App />);
+</script>
+</body></html>
