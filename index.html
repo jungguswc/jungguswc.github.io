@@ -34,6 +34,62 @@ const PROJECTS = [{"분과": "복지기획분과", "사업번호": "Ⅰ-2-1", "�
 const BUNGA_ORDER = ["복지기획분과", "노인분과", "여성가족분과", "장애인분과", "아동청소년분과",
   "자살예방분과", "일자리분과", "사회적고립예방분과", "복지마을분과"];
 
+/* ── 공식 점검표(세부사업담당자) 척도 정의 (5단계/5점 척도로 세분화) ─ */
+const SCALE5 = ["매우충실", "충실", "보통", "미흡", "매우미흡"];
+const SCALE5_DESC = {
+  매우충실: "계획대비 90% 이상", 충실: "계획대비 70~89%", 보통: "계획대비 50~69%",
+  미흡: "계획대비 30~49%", 매우미흡: "계획대비 29% 이하"
+};
+
+const LIKERT_LABELS = ["①전혀그렇지않다", "②그렇지않다", "③보통이다", "④그렇다", "⑤매우그렇다"];
+
+// 4. 점검사항 (8문항, 2개 그룹)
+const CHECK1_GROUPS = [
+  { group: "전반적 추진사항", items: [
+    { key: "c1_1", label: "사업이 추진일정에 맞게 사업이 잘 진행되고 있다" },
+    { key: "c1_2", label: "사업의 예산이 성과 도출에 적절하게 편성되었다" },
+    { key: "c1_3", label: "예산 집행이 계획대로 잘 진행되고 있다" },
+    { key: "c1_4", label: "전 과정에서 사업의 운영관리가 잘 이루어지고 있다" },
+  ]},
+  { group: "환경대응", items: [
+    { key: "c1_5", label: "사업 추진에 모니터링 결과를 활용할 생각이 있다" },
+    { key: "c1_6", label: "급작스런 지역의 환경변화 사업변경 계획이 있다" },
+    { key: "c1_7", label: "급작스런 지역의 환경변화로 사업이 변경되었다" },
+    { key: "c1_8", label: "지역 환경변화에 대응할 수 있는 운영체계가 구축되었다" },
+  ]},
+];
+
+// 6. 기타 점검사항 (17문항, 5개 그룹)
+const CHECK2_GROUPS = [
+  { group: "인지도", items: [
+    { key: "c2_1", label: "구민이 이 사업 내용에 대해 잘 알고 있다고 생각한다" },
+    { key: "c2_2", label: "사업에 대한 홍보가 잘 진행되고 있다고 생각한다" },
+    { key: "c2_3", label: "전반적으로 이 사업에 대한 구민의 인지도가 높다고 생각한다" },
+  ]},
+  { group: "적절성", items: [
+    { key: "c2_4", label: "사업취지와 목적에 맞게 잘 운영되고 있다고 생각한다" },
+    { key: "c2_5", label: "예산 및 자원 확보가 적절하게 이루어졌다고 생각한다" },
+    { key: "c2_6", label: "전반적으로 사업내용과 절차가 성과달성 하는데 적절하다고 생각한다" },
+  ]},
+  { group: "민관협력", items: [
+    { key: "c2_7", label: "사업추진에 있어 민간기관과 연계 및 협력이 잘 되고 있다고 생각한다" },
+    { key: "c2_8", label: "계획 수립 및 추진 시 구민참여가 잘 되고 있다고 생각한다" },
+    { key: "c2_9", label: "민-관 협력이 미흡하다고 생각한다" },
+    { key: "c2_10", label: "전반적으로 사업이 구민의 의견이 잘 반영되었다고 생각한다" },
+  ]},
+  { group: "지속발전가능성", items: [
+    { key: "c2_11", label: "지역의 인적·물적 자원을 잘 활용하고 있다고 생각한다" },
+    { key: "c2_12", label: "사업의 성과분석 등 평가체계가 잘 구성되었다고 생각한다" },
+    { key: "c2_13", label: "사업이 지역의 복지발전과 지속발전을 가능하게 한다고 생각한다" },
+    { key: "c2_14", label: "전반적으로 사업의 지속발전 가능성이 있다고 생각한다" },
+  ]},
+  { group: "균형발전", items: [
+    { key: "c2_15", label: "전반적으로 이 사업이 지역 균형발전에 기여한다고 생각한다" },
+    { key: "c2_16", label: "지역균형발전을 위해 이 사업을 확대해야 한다고 생각한다" },
+    { key: "c2_17", label: "이 사업이 지역의 복지 사각지대 해소에 기여한다고 생각한다" },
+  ]},
+];
+
 const C = {
   navy: "#1E2761", navyDark: "#141A45", navySoft: "#E8EAF5",
   paper: "#F6F4EE", surface: "#FFFFFF", ink: "#1C201D",
@@ -85,6 +141,14 @@ function gradeColor(g) {
   if (g === "보통") return C.warn;
   return C.bad;
 }
+function gradeColor5(g) {
+  if (g === "매우충실") return C.ok;
+  if (g === "충실") return "#4C8C6B";
+  if (g === "보통") return C.warn;
+  if (g === "미흡") return "#C9823D";
+  if (g === "매우미흡") return C.bad;
+  return C.muted;
+}
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -126,29 +190,104 @@ function FileAttach({ files, setFiles }) {
   );
 }
 
-/* ── 공공(사업담당) : 실적입력 ──────────────────────────────── */
+/* ── 5단계 척도(매우충실/충실/보통/미흡/매우미흡) 선택 위젯 ──── */
+function Scale5Picker({ value, onChange }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      {SCALE5.map((s) => (
+        <button type="button" key={s} onClick={() => onChange(s)}
+          className="rounded-lg px-3 py-2 text-sm font-semibold text-left"
+          style={{ border: `2px solid ${value === s ? C.navy : C.line}`, background: value === s ? C.navySoft : "#fff", color: value === s ? C.navy : C.ink }}>
+          <div>{s}</div>
+          <div className="text-xs font-normal mt-0.5" style={{ color: C.muted }}>{SCALE5_DESC[s]}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ── 4점 리커트(①~④) 점검표 블록 (그룹별 문항 + 비고) ────────── */
+function LikertBlock({ groups, values, setValue, note, setNote, noteLabel }) {
+  return (
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: C.navy, color: "#fff" }}>
+              <th className="px-2 py-2 text-left" style={{ width: "92px" }}>구분</th>
+              <th className="px-2 py-2 text-left">문항 내용</th>
+              {LIKERT_LABELS.map((l) => (
+                <th key={l} className="px-1 py-2 text-center" style={{ width: "36px" }} title={l}>{l.slice(0, 1)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map((g) => g.items.map((it, idx) => (
+              <tr key={it.key} style={{ borderBottom: `1px solid ${C.line}` }}>
+                {idx === 0 && (
+                  <td rowSpan={g.items.length} className="px-2 py-2 font-semibold align-top text-xs" style={{ background: C.navySoft, color: C.navy }}>{g.group}</td>
+                )}
+                <td className="px-2 py-2">{it.label}</td>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <td key={n} className="px-1 py-2 text-center">
+                    <input type="radio" name={it.key} checked={values[it.key] === n} onChange={() => setValue(it.key, n)} />
+                  </td>
+                ))}
+              </tr>
+            )))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-3">
+        <Field label={noteLabel || "비고 (변경계획 등 간단히 기술)"}>
+          <TA value={note} onChange={setNote} rows={2} />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+/* ── 공공(사업담당) : 실적입력 (공식 점검표 서식 반영) ────────── */
 function GonggongInput({ flash }) {
   const [code, setCode] = useState("");
-  const [form, setForm] = useState({
-    officerName: "", officerPhone: "", budgetPlan: "", budgetSpent: "",
-    goalContent: "", goalStatus: "", hasChange: false, changeContent: "",
-    progress: "", plan: ""
+  const blankForm = () => ({
+    officerName: "", officerPhone: "",
+    typeJungjeom: "", typeMingwan: "", typeGyunhyung: "", // "유" | "무"
+    budgetPlan: "", budgetSpent: "",
+    scale1: "", changeNeeded: "", changeContent: "",
+    scale2: "", officerOpinion2: "",
+    scale3: "",
+    check1: {}, check1Note: "",
+    progressPlan: "",
+    check2: {}, check2Note: "",
+    nextPlanNote: "", suggestion: "",
   });
+  const [form, setForm] = useState(blankForm());
   const [files, setFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
   const project = PROJECTS.find((p) => p.사업번호 === code);
-  const set = (k, v) => setForm({ ...form, [k]: v });
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setCheck1 = (k, v) => setForm((f) => ({ ...f, check1: { ...f.check1, [k]: v } }));
+  const setCheck2 = (k, v) => setForm((f) => ({ ...f, check2: { ...f.check2, [k]: v } }));
   const rate = form.budgetPlan > 0 ? Math.round((Number(form.budgetSpent) / Number(form.budgetPlan)) * 1000) / 10 : null;
+
+  const YesNo = ({ value, onChange }) => (
+    <div className="flex gap-4 text-sm">
+      <label><input type="radio" checked={value === "유"} onChange={() => onChange("유")} /> 유</label>
+      <label><input type="radio" checked={value === "무"} onChange={() => onChange("무")} /> 무</label>
+    </div>
+  );
 
   const submit = async () => {
     if (!code) { alert("사업을 먼저 선택해 주세요."); return; }
     if (!form.officerName) { alert("담당자명을 입력해 주세요."); return; }
+    if (!form.scale1 || !form.scale2 || !form.scale3) { alert("1~3번의 이행현황/이행정도/절차준수 정도를 모두 선택해 주세요."); return; }
     setSubmitting(true);
     try {
       const payload = {
         projectCode: code, projectName: project ? project.사업명 : "", dept: project ? project.담당부서 : "",
-        ...form, files
+        ...form, rate, files
       };
       // Apps Script 웹앱은 POST 응답의 CORS 헤더를 브라우저가 못 읽는 경우가 있어
       // no-cors 모드로 전송합니다 (요청 자체는 정상 처리되지만, 응답 내용은 읽을 수 없습니다).
@@ -159,7 +298,7 @@ function GonggongInput({ flash }) {
         body: JSON.stringify(payload)
       });
       flash(`제출 요청을 보냈습니다. 잠시 후 워크북에서 반영 여부를 확인해 주세요.`);
-      setForm({ officerName: "", officerPhone: "", budgetPlan: "", budgetSpent: "", goalContent: "", goalStatus: "", hasChange: false, changeContent: "", progress: "", plan: "" });
+      setForm(blankForm());
       setFiles([]);
     } catch (err) {
       alert("전송 오류: " + err.message + " (API_URL 설정을 확인해 주세요)");
@@ -185,34 +324,75 @@ function GonggongInput({ flash }) {
       </Card>
 
       {code && (
-        <Card title="실적 입력">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="담당자명" required><IN value={form.officerName} onChange={(v) => set("officerName", v)} /></Field>
-            <Field label="연락처"><IN value={form.officerPhone} onChange={(v) => set("officerPhone", v)} placeholder="000-0000" /></Field>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="사업비 계획(백만원)"><IN type="number" value={form.budgetPlan} onChange={(v) => set("budgetPlan", v)} /></Field>
-            <Field label="사업비 집행(백만원)"><IN type="number" value={form.budgetSpent} onChange={(v) => set("budgetSpent", v)} /></Field>
-            <Field label="집행률(자동계산)"><div className="rounded-md px-3 py-2 text-sm font-bold" style={{ background: C.navySoft, color: C.navy }}>{rate !== null ? `${rate}%` : "-"}</div></Field>
-          </div>
-          <Field label="성과목표 내용"><TA value={form.goalContent} onChange={(v) => set("goalContent", v)} /></Field>
-          <Field label="성과목표 달성현황"><TA value={form.goalStatus} onChange={(v) => set("goalStatus", v)} /></Field>
-          <Field label="변경사항 여부">
-            <div className="flex gap-4 text-sm">
-              <label><input type="radio" checked={!form.hasChange} onChange={() => set("hasChange", false)} /> 없음</label>
-              <label><input type="radio" checked={form.hasChange} onChange={() => set("hasChange", true)} /> 있음</label>
+        <div>
+          <Card title="사업담당 / 사업유형 구분">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="담당자명" required><IN value={form.officerName} onChange={(v) => set("officerName", v)} /></Field>
+              <Field label="연락처"><IN value={form.officerPhone} onChange={(v) => set("officerPhone", v)} placeholder="000-0000" /></Field>
             </div>
-          </Field>
-          {form.hasChange && <Field label="변경사항 내용"><TA value={form.changeContent} onChange={(v) => set("changeContent", v)} /></Field>}
-          <Field label="상반기 추진현황"><TA value={form.progress} onChange={(v) => set("progress", v)} rows={3} /></Field>
-          <Field label="향후계획"><TA value={form.plan} onChange={(v) => set("plan", v)} rows={3} /></Field>
-          <Field label="증빙자료 첨부"><FileAttach files={files} setFiles={setFiles} /></Field>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="중점추진사업"><YesNo value={form.typeJungjeom} onChange={(v) => set("typeJungjeom", v)} /></Field>
+              <Field label="민관협력사업"><YesNo value={form.typeMingwan} onChange={(v) => set("typeMingwan", v)} /></Field>
+              <Field label="균형발전사업"><YesNo value={form.typeGyunhyung} onChange={(v) => set("typeGyunhyung", v)} /></Field>
+            </div>
+          </Card>
+
+          <Card title="1. 사업비 이행 현황" right={<Pill color={C.navy}>5단계 척도</Pill>}>
+            <Scale5Picker value={form.scale1} onChange={(v) => set("scale1", v)} />
+            <div className="grid grid-cols-3 gap-3 mt-4">
+              <Field label="2026년도 예산(백만원)"><IN type="number" value={form.budgetPlan} onChange={(v) => set("budgetPlan", v)} /></Field>
+              <Field label="예산 집행액(백만원)"><IN type="number" value={form.budgetSpent} onChange={(v) => set("budgetSpent", v)} /></Field>
+              <Field label="집행률(자동계산)"><div className="rounded-md px-3 py-2 text-sm font-bold" style={{ background: C.navySoft, color: C.navy }}>{rate !== null ? `${rate}%` : "-"}</div></Field>
+            </div>
+            <Field label="변경 필요여부">
+              <div className="flex gap-4 text-sm">
+                <label><input type="radio" checked={form.changeNeeded === "변경"} onChange={() => set("changeNeeded", "변경")} /> 변경</label>
+                <label><input type="radio" checked={form.changeNeeded === "미변경"} onChange={() => set("changeNeeded", "미변경")} /> 미변경</label>
+              </div>
+            </Field>
+            {form.changeNeeded === "변경" && <Field label="변경내용 (변경필요시만 작성)"><TA value={form.changeContent} onChange={(v) => set("changeContent", v)} /></Field>}
+          </Card>
+
+          <Card title="2. 성과목표 이행정도" right={<Pill color={C.navy}>5단계 척도</Pill>}>
+            <Scale5Picker value={form.scale2} onChange={(v) => set("scale2", v)} />
+            <div className="mt-4">
+              <Field label="담당자 의견"><TA value={form.officerOpinion2} onChange={(v) => set("officerOpinion2", v)} rows={3} /></Field>
+            </div>
+          </Card>
+
+          <Card title="3. 변경내용 및 절차준수 정도" right={<Pill color={C.navy}>5단계 척도</Pill>}>
+            <Scale5Picker value={form.scale3} onChange={(v) => set("scale3", v)} />
+          </Card>
+
+          <Card title="4. 점검사항" right={<Pill color={C.navy}>①~⑤ 5점 척도 · 8문항</Pill>}>
+            <LikertBlock groups={CHECK1_GROUPS} values={form.check1} setValue={setCheck1}
+              note={form.check1Note} setNote={(v) => set("check1Note", v)} />
+          </Card>
+
+          <Card title="5. 26년 상반기(1월~6월) 추진현황 및 향후계획">
+            <TA value={form.progressPlan} onChange={(v) => set("progressPlan", v)} rows={5}
+              placeholder={"(예시) 지역사회보장협의체 사무국 정기 간담회 개최(2회)\n(예시) 예산액 1,000천원 중 500천원 집행(50% 집행)\n(예시) 실시설계 착공\n(예시) 향후계획 : 복지사각지대 담당자 교육(7월), 사회보장위원 세미나(8월) 등"} />
+          </Card>
+
+          <Card title="6. 기타 점검사항" right={<Pill color={C.navy}>①~⑤ 5점 척도 · 17문항</Pill>}>
+            <LikertBlock groups={CHECK2_GROUPS} values={form.check2} setValue={setCheck2}
+              note={form.check2Note} setNote={(v) => set("check2Note", v)} />
+          </Card>
+
+          <Card title="7. 기타의견">
+            <Field label="차기계획 시 수정반영할 점"><TA value={form.nextPlanNote} onChange={(v) => set("nextPlanNote", v)} rows={2} /></Field>
+            <Field label="건의사항 등 기타의견"><TA value={form.suggestion} onChange={(v) => set("suggestion", v)} rows={2} /></Field>
+          </Card>
+
+          <Card title="증빙자료 첨부">
+            <FileAttach files={files} setFiles={setFiles} />
+          </Card>
 
           <button onClick={submit} disabled={submitting} className="w-full py-3 rounded-lg font-bold text-white mt-2"
             style={{ background: submitting ? C.muted : C.navy }}>
             {submitting ? "제출 중..." : "제출하기"}
           </button>
-        </Card>
+        </div>
       )}
     </div>
   );
@@ -244,14 +424,18 @@ function MonitorView({ data }) {
           {!perf ? (
             <p className="text-sm" style={{ color: C.muted }}>아직 담당 공무원이 제출한 실적자료가 없습니다.</p>
           ) : (
-            <div className="text-sm space-y-2">
+            <div className="text-sm space-y-3">
               <div><b>담당자:</b> {perf.담당자명} ({perf.연락처})</div>
-              <div><b>사업비:</b> 계획 {perf["사업비_계획(백만원)"]}백만원 / 집행 {perf["사업비_집행(백만원)"]}백만원 (집행률 {perf["집행률(%)"]}%)</div>
-              <div><b>성과목표:</b> {perf.성과목표_내용}</div>
-              <div><b>달성현황:</b> {perf.성과목표_달성현황}</div>
-              <div><b>변경사항:</b> {perf.변경사항_유무} {perf.변경사항_내용 ? `— ${perf.변경사항_내용}` : ""}</div>
-              <div><b>상반기 추진현황:</b> {perf.상반기_추진현황}</div>
-              <div><b>향후계획:</b> {perf.향후계획}</div>
+              <div><b>사업유형:</b> 중점추진 {perf.중점추진사업 || "-"} · 민관협력 {perf.민관협력사업 || "-"} · 균형발전 {perf.균형발전사업 || "-"}</div>
+              <div><b>사업비:</b> 계획 {perf["2026년도_예산(백만원)"]}백만원 / 집행 {perf["예산_집행액(백만원)"]}백만원 (집행률 {perf["집행률(%)"]}%)</div>
+              <div><b>1. 사업비 이행현황:</b> <Pill color={gradeColor5(perf.사업비_이행현황_구분)}>{perf.사업비_이행현황_구분 || "-"}</Pill> {perf.변경_필요여부 === "변경" ? `(변경 — ${perf.변경내용 || ""})` : ""}</div>
+              <div><b>2. 성과목표 이행정도:</b> <Pill color={gradeColor5(perf.성과목표_이행정도_구분)}>{perf.성과목표_이행정도_구분 || "-"}</Pill></div>
+              {perf.담당자_의견 && <div className="pl-3" style={{ color: C.muted }}>└ 담당자 의견: {perf.담당자_의견}</div>}
+              <div><b>3. 변경내용 및 절차준수 정도:</b> <Pill color={gradeColor5(perf.변경내용및절차준수_구분)}>{perf.변경내용및절차준수_구분 || "-"}</Pill></div>
+              <div><b>상반기 추진현황 및 향후계획:</b><div className="whitespace-pre-wrap mt-1" style={{ color: C.muted }}>{perf.상반기_추진현황및향후계획}</div></div>
+              {perf.기타점검_비고 && <div><b>기타 점검 비고:</b> {perf.기타점검_비고}</div>}
+              {perf.차기계획_수정반영할점 && <div><b>차기계획 수정반영할 점:</b> {perf.차기계획_수정반영할점}</div>}
+              {perf.건의사항_기타의견 && <div><b>건의사항/기타의견:</b> {perf.건의사항_기타의견}</div>}
               {perf.첨부파일_링크 && (
                 <div><b>첨부자료:</b> {perf.첨부파일_링크.split(",").map((u, i) => (
                   <a key={i} href={u.trim()} target="_blank" rel="noreferrer" className="underline mr-2" style={{ color: C.navy }}>파일{i + 1}</a>
