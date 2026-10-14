@@ -247,9 +247,54 @@ function LikertBlock({ groups, values, setValue, note, setNote, noteLabel }) {
   );
 }
 
-/* ── 공공(사업담당) : 실적입력 (공식 점검표 서식 반영) ────────── */
-function GonggongInput({ flash }) {
+/* ── 접속코드 입력 화면 (서버에서 코드 확인) ─────────────────── */
+function CodeGate({ title, desc, label, secret, allow, onSuccess }) {
   const [code, setCode] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    const c = code.trim();
+    if (!c) { setErr("코드를 입력해 주세요."); return; }
+    setBusy(true); setErr("");
+    try {
+      const res = await fetch(`${API_URL}?action=login&code=${encodeURIComponent(c)}`);
+      const j = await res.json();
+      if (j.status === "ok" && allow.includes(j.role)) {
+        onSuccess({ code: c, role: j.role, projectCode: j.projectCode || "" });
+      } else if (j.status === "ok") {
+        setErr("이 화면에서 사용할 수 없는 코드입니다. 위쪽 역할 선택을 확인해 주세요.");
+      } else {
+        setErr(j.message || "접속코드가 올바르지 않습니다.");
+      }
+    } catch (e) {
+      setErr("서버에 연결하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.");
+    }
+    setBusy(false);
+  };
+  return (
+    <div className="max-w-md mx-auto mt-6">
+      <Card title={title}>
+        <p className="text-sm mb-4" style={{ color: C.muted }}>{desc}</p>
+        <Field label={label}>
+          <input type={secret ? "password" : "text"} value={code} autoFocus
+            inputMode={secret ? undefined : "numeric"} autoComplete="off"
+            onChange={(e) => setCode(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            className="w-full rounded-md px-3 py-2.5 text-lg tracking-widest"
+            style={{ border: `1px solid ${C.line}` }} />
+        </Field>
+        {err && <p className="text-sm mb-3 font-semibold" style={{ color: C.bad }}>{err}</p>}
+        <button onClick={submit} disabled={busy} className="w-full py-3 rounded-lg font-bold text-white"
+          style={{ background: busy ? C.muted : C.navy }}>{busy ? "확인 중..." : "확인"}</button>
+      </Card>
+    </div>
+  );
+}
+
+/* ── 공공(사업담당) : 실적입력 (공식 점검표 서식 반영) ────────── */
+function GonggongInput({ flash, auth, onLogout }) {
+  const isAdmin = auth.role === "admin";
+  const [code, setCode] = useState(isAdmin ? "" : auth.projectCode);
   const blankForm = () => ({
     officerName: "", officerPhone: "",
     typeJungjeom: "", typeMingwan: "", typeGyunhyung: "", // "유" | "무"
@@ -287,6 +332,7 @@ function GonggongInput({ flash }) {
     try {
       const payload = {
         projectCode: code, projectName: project ? project.사업명 : "", dept: project ? project.담당부서 : "",
+        accessCode: auth.code,
         ...form, rate, files
       };
       // Apps Script 웹앱은 POST 응답의 CORS 헤더를 브라우저가 못 읽는 경우가 있어
@@ -297,7 +343,7 @@ function GonggongInput({ flash }) {
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
       });
-      flash(`제출 요청을 보냈습니다. 잠시 후 워크북에서 반영 여부를 확인해 주세요.`);
+      flash(`제출되었습니다. 수정이 필요하면 다시 제출하지 말고 사무국으로 연락해 주세요.`);
       setForm(blankForm());
       setFiles([]);
     } catch (err) {
@@ -309,7 +355,8 @@ function GonggongInput({ flash }) {
 
   return (
     <div>
-      <Card title="사업 선택">
+      {isAdmin ? (
+      <Card title="사업 선택 (사무국 대리입력)">
         <select value={code} onChange={(e) => setCode(e.target.value)} className="w-full rounded-md px-3 py-2 text-sm" style={{ border: `1px solid ${C.line}` }}>
           <option value="">-- 담당 사업을 선택하세요 --</option>
           {BUNGA_ORDER.map((b) => (
@@ -322,8 +369,20 @@ function GonggongInput({ flash }) {
         </select>
         {project && <p className="text-xs mt-2" style={{ color: C.muted }}>담당부서: {project.담당부서} · 유형: {project.유형명}</p>}
       </Card>
+      ) : (
+      <Card title="입력 사업" right={<button onClick={onLogout} className="text-xs px-3 py-1.5 rounded-md" style={{ border: `1px solid ${C.line}`, color: C.muted }}>다른 사업 코드 입력</button>}>
+        {project ? (
+          <div>
+            <div className="text-lg font-bold" style={{ color: C.navy }}>{project.사업번호} · {project.사업명}</div>
+            <p className="text-xs mt-1" style={{ color: C.muted }}>{project.분과} · 담당부서: {project.담당부서} · 유형: {project.유형명}</p>
+          </div>
+        ) : (
+          <p className="text-sm" style={{ color: C.bad }}>접속코드에 연결된 사업({auth.projectCode})을 찾을 수 없습니다. 사무국에 문의해 주세요.</p>
+        )}
+      </Card>
+      )}
 
-      {code && (
+      {code && project && (
         <div>
           <Card title="사업담당 / 사업유형 구분">
             <div className="grid grid-cols-2 gap-3">
@@ -341,7 +400,7 @@ function GonggongInput({ flash }) {
             <Scale5Picker value={form.scale1} onChange={(v) => set("scale1", v)} />
             <div className="grid grid-cols-3 gap-3 mt-4">
               <Field label="2026년도 예산(백만원)"><IN type="number" value={form.budgetPlan} onChange={(v) => set("budgetPlan", v)} /></Field>
-              <Field label="예산 집행액(백만원)"><IN type="number" value={form.budgetSpent} onChange={(v) => set("budgetSpent", v)} /></Field>
+              <Field label="예산 집행액(백만원, 10월 말 기준)"><IN type="number" value={form.budgetSpent} onChange={(v) => set("budgetSpent", v)} /></Field>
               <Field label="집행률(자동계산)"><div className="rounded-md px-3 py-2 text-sm font-bold" style={{ background: C.navySoft, color: C.navy }}>{rate !== null ? `${rate}%` : "-"}</div></Field>
             </div>
             <Field label="변경 필요여부">
@@ -369,9 +428,10 @@ function GonggongInput({ flash }) {
               note={form.check1Note} setNote={(v) => set("check1Note", v)} />
           </Card>
 
-          <Card title="5. 26년 상반기(1월~6월) 추진현황 및 향후계획">
+          <Card title="5. 26년 10월 말 기준 추진현황(예상치 포함) 및 향후계획">
+            <p className="text-xs mb-2" style={{ color: C.bad }}>※ 10월 말 기준으로 작성하며, 아직 진행 전인 프로그램·회의 등은 10월 말까지의 예상치로 입력해 주세요.</p>
             <TA value={form.progressPlan} onChange={(v) => set("progressPlan", v)} rows={5}
-              placeholder={"(예시) 지역사회보장협의체 사무국 정기 간담회 개최(2회)\n(예시) 예산액 1,000천원 중 500천원 집행(50% 집행)\n(예시) 실시설계 착공\n(예시) 향후계획 : 복지사각지대 담당자 교육(7월), 사회보장위원 세미나(8월) 등"} />
+              placeholder={"(예시) 추진현황(10월 말 기준, 예상치 포함): 예산 60백만원 / 집행 52백만원(집행률 86.7%)\n(예시) ○ 프로그램 운영 210회기, 이용인원 2,600명\n(예시) ○ 운영회의 3회, 25명 참여\n(예시) 향후계획 : 11~12월 상시프로그램 지속 운영, 연말 성과보고회 개최 등"} />
           </Card>
 
           <Card title="6. 기타 점검사항" right={<Pill color={C.navy}>①~⑤ 5점 척도 · 17문항</Pill>}>
@@ -401,7 +461,7 @@ function GonggongInput({ flash }) {
 /* ── 모니터링단/전문가 : 자료열람 + 평가 링크 ───────────────── */
 function MonitorView({ data }) {
   const [code, setCode] = useState("");
-  const perf = data.performance.find((p) => p.사업번호 === code);
+  const perf = data.performance.filter((p) => p.사업번호 === code).slice(-1)[0];
   const project = PROJECTS.find((p) => p.사업번호 === code);
 
   return (
@@ -432,7 +492,7 @@ function MonitorView({ data }) {
               <div><b>2. 성과목표 이행정도:</b> <Pill color={gradeColor5(perf.성과목표_이행정도_구분)}>{perf.성과목표_이행정도_구분 || "-"}</Pill></div>
               {perf.담당자_의견 && <div className="pl-3" style={{ color: C.muted }}>└ 담당자 의견: {perf.담당자_의견}</div>}
               <div><b>3. 변경내용 및 절차준수 정도:</b> <Pill color={gradeColor5(perf.변경내용및절차준수_구분)}>{perf.변경내용및절차준수_구분 || "-"}</Pill></div>
-              <div><b>상반기 추진현황 및 향후계획:</b><div className="whitespace-pre-wrap mt-1" style={{ color: C.muted }}>{perf.상반기_추진현황및향후계획}</div></div>
+              <div><b>추진현황(10월 말 기준) 및 향후계획:</b><div className="whitespace-pre-wrap mt-1" style={{ color: C.muted }}>{perf.상반기_추진현황및향후계획}</div></div>
               {perf.기타점검_비고 && <div><b>기타 점검 비고:</b> {perf.기타점검_비고}</div>}
               {perf.차기계획_수정반영할점 && <div><b>차기계획 수정반영할 점:</b> {perf.차기계획_수정반영할점}</div>}
               {perf.건의사항_기타의견 && <div><b>건의사항/기타의견:</b> {perf.건의사항_기타의견}</div>}
@@ -581,22 +641,27 @@ function App() {
   const [role, setRole] = useState("gonggong");
   const [tab, setTab] = useState("input");
   const [data, setData] = useState({ performance: [], scores: [], bungaSummary: [] });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [auth, setAuth] = useState(null); // { code, role, projectCode }
   const [toast, setToast] = useState("");
 
-  const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2500); };
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 5000); };
 
-  const load = useCallback(async () => {
+  const emptyData = { performance: [], scores: [], bungaSummary: [] };
+  const load = useCallback(async (code) => {
+    if (!code) return;
     setLoading(true);
     try {
-      const res = await fetch(API_URL);
+      const res = await fetch(`${API_URL}?action=data&code=${encodeURIComponent(code)}`);
       const json = await res.json();
       if (json.status === "ok") setData({ performance: json.performance || [], scores: json.scores || [], bungaSummary: json.bungaSummary || [] });
-    } catch (e) { /* API_URL 미설정 시 무시 */ }
+      else { setAuth(null); setData(emptyData); alert(json.message || "열람 권한이 없습니다."); }
+    } catch (e) { alert("자료를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요."); }
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const logout = () => { setAuth(null); setData(emptyData); };
+  const onAuth = (a) => { setAuth(a); if (role !== "gonggong") load(a.code); };
 
   const tabsByRole = {
     admin: [["dashboard", "종합대시보드"], ["projects", "사업별현황"], ["report", "결과보고서"]],
@@ -605,7 +670,7 @@ function App() {
     expert: [["view", "자료열람"]],
   };
 
-  useEffect(() => { setTab(tabsByRole[role][0][0]); }, [role]);
+  useEffect(() => { setTab(tabsByRole[role][0][0]); setAuth(null); setData(emptyData); }, [role]);
 
   return (
     <div style={{ background: C.paper, minHeight: "100vh", fontFamily: "'Pretendard','Malgun Gothic',sans-serif" }}>
@@ -616,6 +681,7 @@ function App() {
           <select value={role} onChange={(e) => setRole(e.target.value)} className="rounded-md px-3 py-1.5 text-sm text-black">
             {ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
           </select>
+          {auth && <button onClick={logout} className="ml-2 rounded-md px-3 py-1.5 text-sm" style={{ border: "1px solid rgba(255,255,255,.5)" }}>🔒 나가기</button>}
         </div>
       </div>
 
@@ -626,13 +692,24 @@ function App() {
             {label}
           </button>
         ))}
-        <button onClick={load} className="ml-auto text-xs px-3 py-1.5 rounded-md" style={{ border: `1px solid ${C.line}`, color: C.muted }}>🔄 새로고침</button>
+        {auth && role !== "gonggong" && <button onClick={() => load(auth.code)} className="ml-auto text-xs px-3 py-1.5 rounded-md" style={{ border: `1px solid ${C.line}`, color: C.muted }}>🔄 새로고침</button>}
       </div>
 
       <div className="p-6">
-        {loading ? <p style={{ color: C.muted }}>불러오는 중…</p> : (
+        {!auth ? (
+          role === "gonggong" ? (
+            <CodeGate title="사업 접속코드 입력" label="접속코드 (4자리)" allow={["project", "admin"]} onSuccess={onAuth}
+              desc="사무국에서 안내받은 담당 사업의 접속코드를 입력하세요. 코드에 해당하는 사업의 입력 화면이 열립니다." />
+          ) : role === "admin" ? (
+            <CodeGate title="사무국 관리자 로그인" label="관리자 비밀번호" secret allow={["admin"]} onSuccess={onAuth}
+              desc="관리자 화면은 사무국만 이용할 수 있습니다." />
+          ) : (
+            <CodeGate title="모니터링 위원 접속" label="위원 접속코드" secret allow={["committee", "admin"]} onSuccess={onAuth}
+              desc="사무국에서 안내받은 위원 접속코드를 입력하면 사업별 제출자료를 열람할 수 있습니다." />
+          )
+        ) : loading ? <p style={{ color: C.muted }}>불러오는 중…</p> : (
           <>
-            {tab === "input" && <GonggongInput flash={flash} />}
+            {tab === "input" && <GonggongInput key={auth.code} flash={flash} auth={auth} onLogout={logout} />}
             {tab === "view" && <MonitorView data={data} />}
             {tab === "dashboard" && <AdminDashboard data={data} />}
             {tab === "projects" && <AdminProjectList data={data} />}
