@@ -17,7 +17,7 @@ const { useState, useEffect, useMemo, useCallback } = React;
 /* ══════════════════════════════════════════════════════════════
    중구 지역사회보장계획 2026년 연차별 시행계획 온라인 모니터링 시스템
    - 관리자 / 공공(사업담당) / 모니터링단 / 전문가 4개 역할
-   - 공공: 실적입력(파일첨부 포함) → 백엔드(Apps Script)로 전송
+   - 공공: 실적입력 → 백엔드(Apps Script)로 전송 (2차 모니터링부터 파일첨부 생략)
    - 모니터링단·전문가: 공공 제출자료 열람 → 기존 구글폼으로 평가
    - 관리자: 종합대시보드 · 사업별현황 · 집계결과 · 결과보고서 자동생성
    ══════════════════════════════════════════════════════════════ */
@@ -150,46 +150,6 @@ function gradeColor5(g) {
   return C.muted;
 }
 
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result).split(",")[1]);
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-}
-
-/* ── 파일 첨부 위젯 (한글/PDF/이미지) ───────────────────────── */
-function FileAttach({ files, setFiles }) {
-  const onPick = async (e) => {
-    const picked = Array.from(e.target.files || []);
-    const converted = [];
-    for (const f of picked) {
-      if (f.size > 8 * 1024 * 1024) { alert(`"${f.name}" 파일이 8MB를 초과합니다. 더 작은 파일로 첨부해 주세요.`); continue; }
-      const base64 = await fileToBase64(f);
-      converted.push({ name: f.name, mimeType: f.type || "application/octet-stream", base64 });
-    }
-    setFiles([...files, ...converted]);
-  };
-  return (
-    <div>
-      <input type="file" multiple accept=".hwp,.hwpx,.pdf,image/*" onChange={onPick}
-        className="text-sm" />
-      <p className="text-xs mt-1" style={{ color: C.muted }}>한글(HWP/HWPX)·PDF·이미지 파일 첨부 가능 (파일당 8MB 이하)</p>
-      {files.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {files.map((f, i) => (
-            <li key={i} className="flex items-center justify-between text-sm rounded px-2 py-1" style={{ background: C.navySoft }}>
-              <span>📎 {f.name}</span>
-              <button onClick={() => setFiles(files.filter((_, j) => j !== i))} className="text-xs font-bold" style={{ color: C.bad }}>삭제</button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 /* ── 5단계 척도(매우충실/충실/보통/미흡/매우미흡) 선택 위젯 ──── */
 function Scale5Picker({ value, onChange }) {
   return (
@@ -308,7 +268,6 @@ function GonggongInput({ flash, auth, onLogout }) {
     nextPlanNote: "", suggestion: "",
   });
   const [form, setForm] = useState(blankForm());
-  const [files, setFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
   const project = PROJECTS.find((p) => p.사업번호 === code);
@@ -333,7 +292,7 @@ function GonggongInput({ flash, auth, onLogout }) {
       const payload = {
         projectCode: code, projectName: project ? project.사업명 : "", dept: project ? project.담당부서 : "",
         accessCode: auth.code,
-        ...form, rate, files
+        ...form, rate, files: []
       };
       // Apps Script 웹앱은 POST 응답의 CORS 헤더를 브라우저가 못 읽는 경우가 있어
       // no-cors 모드로 전송합니다 (요청 자체는 정상 처리되지만, 응답 내용은 읽을 수 없습니다).
@@ -345,7 +304,6 @@ function GonggongInput({ flash, auth, onLogout }) {
       });
       flash(`제출되었습니다. 수정이 필요하면 다시 제출하지 말고 사무국으로 연락해 주세요.`);
       setForm(blankForm());
-      setFiles([]);
     } catch (err) {
       alert("전송 오류: " + err.message + " (API_URL 설정을 확인해 주세요)");
     } finally {
@@ -444,10 +402,6 @@ function GonggongInput({ flash, auth, onLogout }) {
             <Field label="건의사항 등 기타의견"><TA value={form.suggestion} onChange={(v) => set("suggestion", v)} rows={2} /></Field>
           </Card>
 
-          <Card title="증빙자료 첨부">
-            <FileAttach files={files} setFiles={setFiles} />
-          </Card>
-
           <button onClick={submit} disabled={submitting} className="w-full py-3 rounded-lg font-bold text-white mt-2"
             style={{ background: submitting ? C.muted : C.navy }}>
             {submitting ? "제출 중..." : "제출하기"}
@@ -496,11 +450,6 @@ function MonitorView({ data }) {
               {perf.기타점검_비고 && <div><b>기타 점검 비고:</b> {perf.기타점검_비고}</div>}
               {perf.차기계획_수정반영할점 && <div><b>차기계획 수정반영할 점:</b> {perf.차기계획_수정반영할점}</div>}
               {perf.건의사항_기타의견 && <div><b>건의사항/기타의견:</b> {perf.건의사항_기타의견}</div>}
-              {perf.첨부파일_링크 && (
-                <div><b>첨부자료:</b> {perf.첨부파일_링크.split(",").map((u, i) => (
-                  <a key={i} href={u.trim()} target="_blank" rel="noreferrer" className="underline mr-2" style={{ color: C.navy }}>파일{i + 1}</a>
-                ))}</div>
-              )}
             </div>
           )}
           <a href={MONITOR_FORM_URL} target="_blank" rel="noreferrer">
